@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>検索結果画面</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .selected-row {
+            background-color: #f8d7da;
+        }
+        .alert-dismissible .btn-close {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            right: 1rem;
+        }
+        .table th, .table td {
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="container mt-5">
+
+    <h2>{{ display_date }} 検索結果</h2>
+
+    {% if table_data %}
+    <table class="table table-bordered" id="result-table">
+        <thead>
+            <tr>
+                <th>No</th> <!-- 自動付番する No -->
+                <th>車No</th>
+                <th>車名</th>
+                <th>工程</th>
+                <th>ステータス</th>
+                <th>作業開始日</th>
+                <th>作業終了日</th>
+                <th>合計時間</th>
+                <th>入庫日</th>
+                <th>担当者名</th>
+                <th>優先順位</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_data %}
+            <tr data-id="{{ row[1] }}"> <!-- rowid をデータ属性として利用 -->
+                <td contenteditable="false">{{ loop.index }}</td> <!-- 自動でNoを付番 -->
+                {% for index in range(1, columns|length) %}
+                <td contenteditable="true">
+                    {% if columns[index] == '合計時間' %}
+                        {{ "%.2f"|format(row[index + 1] | float if row[index + 1] is not none and row[index + 1] != '' else 0.00) }}
+                    {% else %}
+                        {{ row[index + 1] if row[index + 1] is not none else '' }}
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="alert alert-danger">データがありません。</div>
+    {% endif %}
+
+    <div id="error-message" class="alert alert-danger d-none alert-dismissible mt-3">
+        <span id="error-text"></span>
+        <button type="button" class="btn-close" aria-label="閉じる" onclick="closeErrorMessage()"></button>
+    </div>
+
+    <div class="d-flex justify-content-start mt-4">
+        <button id="update-btn" class="btn btn-primary me-2" disabled>更新</button>
+        <button id="add-row-btn" class="btn btn-secondary me-2">行を追加</button>
+        <button id="delete-btn" class="btn btn-danger me-auto" disabled>削除</button>
+        <button id="end-work-btn" class="btn btn-dark ms-auto">終了</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const updateBtn = document.getElementById("update-btn");
+            const deleteBtn = document.getElementById("delete-btn");
+            const table = document.getElementById("result-table");
+            let selectedRow = null;
+
+            // Jinja2 の columns を JSON に変換し、JavaScript で使えるようにする
+            const columnNames = JSON.parse('{{ columns[1:] | tojson | safe }}');
+
+            // 行をクリックして選択
+            if (table) {
+                table.addEventListener("click", function (e) {
+                    const row = e.target.closest("tr");
+                    if (selectedRow) selectedRow.classList.remove("selected-row");
+                    row.classList.add("selected-row");
+                    selectedRow = row;
+                    updateBtn.disabled = false;
+                    deleteBtn.disabled = false; // 削除ボタン有効化
+                });
+            }
+
+            // 更新ボタンの処理
+            updateBtn.addEventListener("click", function () {
+                if (!selectedRow) return;
+
+                const rowId = selectedRow.dataset.id;
+                const cells = selectedRow.querySelectorAll("td");
+                const rowData = {};
+
+                columnNames.forEach((column, index) => {
+                    let value = cells[index + 1].innerText.trim();// Noをスキップ
+                    if (column === "合計時間") {
+                        value = parseFloat(value).toFixed(2);
+                        if (isNaN(value)) value = "0.00";
+                    }
+                    rowData[column] = value;
+                });
+
+                // 必須項目のチェック
+                const requiredFields = ["車No", "車名", "工程", "ステータス", "合計時間", "入庫日", "担当者名", "優先順位"];
+                for (let field of requiredFields) {
+                    if (!rowData[field]) {
+                        alert("新規追加内容が誤っているため、登録ができませんでした。");
+                        return;
+                    }
+                }
+
+                // 更新リクエストを送信
+                fetch("/update-row", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        row_id: rowId,
+                        row_data: rowData,
+                        search_date: "{{ display_date }}"
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        alert("データが正常に更新されました。");
+                        location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => alert("エラーが発生しました: " + error));
+            });
+
+            // 行を追加ボタン
+            document.getElementById('add-row-btn').addEventListener('click', function () {
+                const tableBody = document.getElementById('result-table').getElementsByTagName('tbody')[0];
+                const rowCount = tableBody.rows.length + 1;
+                const newRow = tableBody.insertRow();
+
+                newRow.innerHTML = `
+                    <td contenteditable="false">${rowCount}</td>
+                    ${columnNames.map(column => 
+                        `<td contenteditable="true">${column === 'ステータス' ? '未実施' : (column === '合計時間' ? '0.00' : '')}</td>`
+                    ).join('')}
+                `;
+            });
+
+            // 削除ボタンの処理
+            deleteBtn.addEventListener("click", function () {
+                if (!selectedRow) return;
+
+                const rowId = selectedRow.dataset.id;
+                if (!confirm("この行を削除してもよろしいですか？")) return;
+
+                fetch("/delete-row", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ row_id: rowId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        alert("データが削除されました。");
+                        location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => alert("エラーが発生しました: " + error));
+            });
+
+            // 終了ボタン
+            document.getElementById('end-work-btn').addEventListener('click', function () {
+                if (confirm("検索を終了します")) {
+                    window.location.href = "pc-menu";
+                }
+            });
+        });
+    </script>
+</body>
+</html>

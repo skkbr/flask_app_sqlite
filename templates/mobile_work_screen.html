@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>作業者画面</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .task-content {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+        .task-label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .button-group {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .button-group .btn {
+            width: 100%;
+            max-width: 400px;
+            margin: 10px auto;
+        }
+    </style>
+</head>
+<body class="container mt-5">
+    <h1 class="text-center mb-4">作業者画面</h1>
+    <h2 class="text-center mb-4">自身の名前を選択してください</h2>
+    <div class="card p-4 mb-4">
+        <h5>担当者名: {{ manager_name }}</h5>
+        <div class="border p-4 my-3" style="min-height: 200px;">
+            {% if task %}
+            <h3 class="mb-4">作業内容</h3>
+            <div class="task-content">
+                <span class="task-label">車No:</span>
+                <span>{{ task[0] }}</span>
+            </div>
+            <div class="task-content">
+                <span class="task-label">車名:</span>
+                <span>{{ task[1] }}</span>
+            </div>
+            <div class="task-content">
+                <span class="task-label">工程:</span>
+                <span>{{ task[2] }}</span>
+            </div>
+            {% else %}
+            <p>作業がありません。</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if task %}
+    <div class="button-group">
+        <button id="start-btn" class="btn btn-primary">作業開始</button>
+        <button id="pause-btn" class="btn btn-warning d-none">作業中断</button>
+        <button id="resume-btn" class="btn btn-success d-none">作業再開</button>
+        <button id="finish-btn" class="btn btn-danger d-none">作業終了</button>
+    </div>
+    {% endif %}
+
+    <script>
+        document.getElementById('start-btn')?.addEventListener('click', function () {
+            fetch('/start-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carNo: "{{ task[0] if task else '' }}",
+                    carName: "{{ task[1] if task else '' }}",
+                    process: "{{ task[2] if task else '' }}",
+                    managerName: "{{ manager_name }}"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('作業を開始しました。');
+                    document.getElementById('start-btn').classList.add('d-none');
+                    document.getElementById('pause-btn').classList.remove('d-none');
+                    document.getElementById('finish-btn').classList.remove('d-none');
+                }
+            });
+        });
+
+        document.getElementById('pause-btn')?.addEventListener('click', function () {
+            fetch('/pause-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carNo: "{{ task[0] if task else '' }}",
+                    carName: "{{ task[1] if task else '' }}",
+                    process: "{{ task[2] if task else '' }}",
+                    managerName: "{{ manager_name }}"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('作業を中断しました。');
+                    document.getElementById('pause-btn').classList.add('d-none');
+                    document.getElementById('resume-btn').classList.remove('d-none');
+                }
+            });
+        });
+
+        document.getElementById('resume-btn')?.addEventListener('click', function () {
+            fetch('/resume-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carNo: "{{ task[0] if task else '' }}",
+                    carName: "{{ task[1] if task else '' }}",
+                    process: "{{ task[2] if task else '' }}",
+                    managerName: "{{ manager_name }}"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('作業を再開しました。');
+                    document.getElementById('resume-btn').classList.add('d-none');
+                    document.getElementById('pause-btn').classList.remove('d-none');
+                    document.getElementById('finish-btn').classList.remove('d-none');
+                }
+            });
+        });
+
+        document.getElementById('finish-btn')?.addEventListener('click', function () {
+            fetch('/finish-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carNo: "{{ task[0] if task else '' }}",
+                    carName: "{{ task[1] if task else '' }}",
+                    process: "{{ task[2] if task else '' }}",
+                    managerName: "{{ manager_name }}"
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('作業が完了しました。');
+                    location.reload();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
