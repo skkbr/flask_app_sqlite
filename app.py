@@ -6,6 +6,7 @@ from datetime import datetime
 from flask import make_response
 import threading
 import time
+import requests
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -44,8 +45,8 @@ def keep_alive_route():
 def keep_alive():
     while True:
         try:
-            response = app.test_client().get("/keep-alive")  # 自分自身のエンドポイントにアクセス
-            print("Keep Alive Ping:", response.status_code)
+            requests.get("https://flask-app-test-bk54.onrender.com/keep-alive")  # Render のエンドポイントを直接叩く
+            print("Keep Alive Ping Sent")
         except Exception as e:
             print("Keep Alive Error:", e)
         time.sleep(600)  # 10分ごとにリクエストを送信
@@ -686,4 +687,5 @@ def delete_manager():
         return jsonify({'status': 'error', 'message': f"エラーが発生しました: {str(e)}"})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, debug=True)
