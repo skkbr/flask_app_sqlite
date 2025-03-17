@@ -4,6 +4,8 @@ import os
 import pandas as pd
 from datetime import datetime
 from flask import make_response
+import threading
+import time
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -32,7 +34,24 @@ def index():
         return redirect('/mobile')  # スマホ用画面にリダイレクト
     else:
         return redirect('/pc-menu')  # PC用画面にリダイレクト
-#    return render_template('menu.html')
+
+# Render のスリープを防ぐための `keep-alive` エンドポイント
+@app.route('/keep-alive')
+def keep_alive_route():
+    return jsonify({"message": "Keep-alive ping received"})
+
+# スリープ防止のため、定期的に自身の `/keep-alive` にアクセスする関数
+def keep_alive():
+    while True:
+        try:
+            response = app.test_client().get("/keep-alive")  # 自分自身のエンドポイントにアクセス
+            print("Keep Alive Ping:", response.status_code)
+        except Exception as e:
+            print("Keep Alive Error:", e)
+        time.sleep(600)  # 10分ごとにリクエストを送信
+
+# サーバー起動時にスリープ防止スレッドを開始
+threading.Thread(target=keep_alive, daemon=True).start()
 
 # スマホ用画面
 @app.route('/mobile', methods=['GET', 'POST'])
@@ -454,6 +473,35 @@ def delete_row():
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'削除に失敗しました: {e}'})
 
+# 読み取り専用のデータ結果表示
+def get_data_results_readonly(search_date):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 車No, 車名, 工程, ステータス, 作業開始日, 作業終了日, 合計時間, 入庫日, 担当者名, 優先順位
+            FROM work_table WHERE 取込日 = ?
+        """, (search_date,))
+        return cursor.fetchall()
+
+@app.route('/data-result-readonly', methods=['GET'])
+def data_result_readonly():
+    search_date = request.args.get('search_date')
+    if not search_date:
+        flash("検索日付が指定されていません。", "danger")
+        return redirect(url_for('search'))
+
+    try:
+        table_data = get_data_results_readonly(search_date)
+        columns = ["No", "車No", "車名", "工程", "ステータス", "作業開始日", "作業終了日", "合計時間", "入庫日", "担当者名", "優先順位"]
+        if not table_data:
+            flash("指定した日付のデータが見つかりませんでした。", "danger")
+            return redirect(url_for('search'))
+        table_data = [[index + 1] + list(row) for index, row in enumerate(table_data)]
+    except Exception as e:
+        flash(f"エラーが発生しました: {e}", "danger")
+        return redirect(url_for('search'))
+
+    return render_template('data_result_readonly.html', display_date=search_date, table_data=table_data, columns=columns)
 
 #検索結果画面(作業内容画面)-本日の作業終了ボタン
 @app.route('/end-work', methods=['POST'])
@@ -586,6 +634,56 @@ def monthly_summary_results():
 
     return render_template('monthly-summary-results.html', selected_month=selected_month, unit=unit, results=results)
 
+# 作業者管理画面のルート
+def get_managers():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 担当者No, 担当者名 FROM table_manager_master ORDER BY 担当者No ASC")
+        return cursor.fetchall()
+
+@app.route('/manage-managers', methods=['GET'])
+def manage_managers():
+    managers = get_managers()
+    return render_template('manager_management.html', managers=managers)
+
+# 作業者の登録処理
+@app.route('/register-manager', methods=['POST'])
+def register_manager():
+    try:
+        manager_name = request.form['manager_name']
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO table_manager_master (担当者名) VALUES (?)", (manager_name,))
+            conn.commit()
+        return jsonify({'status': 'success', 'message': "作業者が登録されました！"})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f"エラーが発生しました: {str(e)}"})
+
+# 作業者の更新処理
+@app.route('/update-manager', methods=['POST'])
+def update_manager():
+    try:
+        data = request.json
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE table_manager_master SET 担当者名 = ? WHERE 担当者No = ?", (data['name'], data['id']))
+            conn.commit()
+        return jsonify({'status': 'success', 'message': "作業者情報を更新しました！"})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f"エラーが発生しました: {str(e)}"})
+
+# 作業者の削除処理
+@app.route('/delete-manager', methods=['POST'])
+def delete_manager():
+    try:
+        data = request.json
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM table_manager_master WHERE 担当者No = ?", (data['id'],))
+            conn.commit()
+        return jsonify({'status': 'success', 'message': "作業者を削除しました！"})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f"エラーが発生しました: {str(e)}"})
 
 if __name__ == '__main__':
     app.run(debug=True)

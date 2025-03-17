@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>検索結果（読み取り専用）</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-5">
+    <h1 class="text-center mb-4">検索結果（読み取り専用）</h1>
+
+    <div class="card p-4">
+        <table class="table table-striped table-bordered" id="data-result-table">
+            <thead class="table-dark">
+                <tr>
+                    <th>No</th>
+                    <th>車No</th>
+                    <th>車名</th>
+                    <th>工程</th>
+                    <th>ステータス</th>
+                    <th>作業開始日</th>
+                    <th>作業終了日</th>
+                    <th>合計時間</th>
+                    <th>入庫日</th>
+                    <th>担当者名</th>
+                    <th>優先順位</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in table_data %}
+                <tr>
+                    <td>{{ result[0] }}</td>
+                    <td>{{ result[1] }}</td>
+                    <td>{{ result[2] }}</td>
+                    <td>{{ result[3] }}</td>
+                    <td>{{ result[4] }}</td>
+                    <td>{{ result[5] if result[5] is not none else '' }}</td>
+                    <td>{{ result[6] if result[6] is not none else '' }}</td>
+                    <td>{{ "{:.2f}".format(result[7]) if result[7] is not none else "0.00" }}</td>
+                    <td>{{ result[8] }}</td>
+                    <td>{{ result[9] }}</td>
+                    <td>{{ result[10] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-5 text-center">
+        <button class="btn btn-secondary" onclick="window.close()">閉じる</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
