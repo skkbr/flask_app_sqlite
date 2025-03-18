@@ -51,8 +51,6 @@ def keep_alive():
             print("Keep Alive Error:", e)
         time.sleep(600)  # 10分ごとにリクエストを送信
 
-# サーバー起動時にスリープ防止スレッドを開始
-threading.Thread(target=keep_alive, daemon=True).start()
 
 # スマホ用画面
 @app.route('/mobile', methods=['GET', 'POST'])
@@ -687,5 +685,7 @@ def delete_manager():
         return jsonify({'status': 'error', 'message': f"エラーが発生しました: {str(e)}"})
 
 if __name__ == '__main__':
+    # サーバー起動時にスリープ防止スレッドを開始
+    threading.Thread(target=keep_alive, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=True)
