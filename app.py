@@ -7,6 +7,7 @@ from flask import make_response
 import threading
 import time
 import requests
+import schedule
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -36,20 +37,30 @@ def index():
     else:
         return redirect('/pc-menu')  # PC用画面にリダイレクト
 
-# Render のスリープを防ぐための `keep-alive` エンドポイント
+# Keep-Alive エンドポイント
 @app.route('/keep-alive')
 def keep_alive_route():
     return jsonify({"message": "Keep-alive ping received"})
 
-# スリープ防止のため、定期的に自身の `/keep-alive` にアクセスする関数
+# Keep-Alive 関数（10分ごとにリクエスト）
 def keep_alive():
+    try:
+        response = requests.get("https://flask-app-test-bk54.onrender.com/keep-alive", timeout=3)
+        print("Keep Alive Ping Sent - Status Code:", response.status_code)
+    except Exception as e:
+        print("Keep Alive Error:", e)
+
+# スケジュールを設定（10分ごとに実行）
+schedule.every(10).minutes.do(keep_alive)
+
+# 別スレッドでスケジュールを実行
+def run_scheduler():
     while True:
-        try:
-            requests.get("https://flask-app-test-bk54.onrender.com/keep-alive")  # Render のエンドポイントを直接叩く
-            print("Keep Alive Ping Sent")
-        except Exception as e:
-            print("Keep Alive Error:", e)
-        time.sleep(600)  # 10分ごとにリクエストを送信
+        schedule.run_pending()
+        time.sleep(60)
+
+# スレッドを起動
+threading.Thread(target=run_scheduler, daemon=True).start()
 
 
 # スマホ用画面
@@ -685,7 +696,5 @@ def delete_manager():
         return jsonify({'status': 'error', 'message': f"エラーが発生しました: {str(e)}"})
 
 if __name__ == '__main__':
-    # サーバー起動時にスリープ防止スレッドを開始
-    threading.Thread(target=keep_alive, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=True)
