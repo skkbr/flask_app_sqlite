@@ -37,12 +37,12 @@ def index():
     else:
         return redirect('/pc-menu')  # PC用画面にリダイレクト
 
-# Keep-Alive エンドポイント
+# Keep-Alive エンドポイント 外部リクエスト（UptimeRobot） 5分ごとに /keep-alive にアクセスする
 @app.route('/keep-alive')
 def keep_alive_route():
-    return jsonify({"message": "Keep-alive ping received"})
+    return "OK", 200
 
-# Keep-Alive 関数（10分ごとにリクエスト）
+# Keep-Alive 関数（10分ごとにリクエスト） 内部リクエスト（requests.get()） アプリ自身が10分ごとに /keep-alive にアクセス
 def keep_alive():
     try:
         response = requests.get("https://flask-app-test-bk54.onrender.com/keep-alive", timeout=3)
